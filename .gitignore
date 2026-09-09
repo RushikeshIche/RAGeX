@@ -1,0 +1,40 @@
+memory.md
+
+# Compiled objects
+*.o
+*.obj
+*.so
+*.dll
+*.a
+*.lib
+
+# Executables
+*.exe
+edge_rag
+
+# Build directories
+build/
+bin/
+out/
+
+# Python scripts (for model conversion) artifacts
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Data and Models
+data/*.txt
+data/*.bin
+models/*.bin
+models/*.onnx
+models/*.pt
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
