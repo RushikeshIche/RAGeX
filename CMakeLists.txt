@@ -13,7 +13,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wpedantic -O3")
 include_directories(include)
 
 # Main executable
-add_executable(edge_rag src/main.c src/memory.c)
+add_executable(edge_rag src/main.c src/memory.c src/math.c)
 
 # Add math library and pthreads
 target_link_libraries(edge_rag m pthread)
