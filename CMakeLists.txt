@@ -17,7 +17,7 @@ endif()
 include_directories(include)
 
 # Main executable
-add_executable(edge_rag src/main.c src/memory.c src/math.c)
+add_executable(edge_rag src/main.c src/memory.c src/math.c src/mmap_utils.c src/loader.c)
 
 # Add math library and pthreads
 if(UNIX)
@@ -25,7 +25,7 @@ if(UNIX)
 endif()
 
 # Benchmark executable
-add_executable(benchmark tests/benchmarks.c src/math.c src/memory.c)
+add_executable(benchmark tests/benchmarks.c src/math.c src/memory.c src/mmap_utils.c src/loader.c)
 if(UNIX)
     target_link_libraries(benchmark m pthread)
 endif()
