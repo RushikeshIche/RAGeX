@@ -7,7 +7,8 @@
     if (strcmp(name, NAME) == 0) { \
         TARGET.ndim = ndim; \
         for(int i=0; i<4; ++i) TARGET.shape[i] = (i < ndim) ? shape[i] : 1; \
-        TARGET.dtype = DTYPE_F32; \
+        TARGET.dtype = (dtype == 1) ? DTYPE_INT8 : DTYPE_F32; \
+        TARGET.scale = scale; \
         TARGET.data = (void*)data_ptr; \
         matched = 1; \
     }
@@ -48,9 +49,24 @@ int load_minilm_model(const char* filepath, MiniLM* model, MmapFile* mf) {
             ptr += sizeof(uint32_t);
         }
 
-        // Now ptr is at the raw float32 data. We just store the pointer, ZERO copying!
-        float* data_ptr = (float*)ptr;
-        ptr += num_elements * sizeof(float); // Advance pointer to next tensor
+        // Read DType (0=F32, 1=INT8)
+        uint32_t dtype = *(uint32_t*)ptr;
+        ptr += sizeof(uint32_t);
+
+        // Read Scale (if INT8)
+        float scale = 1.0f;
+        if (dtype == 1) {
+            scale = *(float*)ptr;
+            ptr += sizeof(float);
+        }
+
+        // Now ptr is at the raw data. Store pointer, ZERO copying!
+        void* data_ptr = (void*)ptr;
+        if (dtype == 1) {
+            ptr += num_elements * sizeof(int8_t);
+        } else {
+            ptr += num_elements * sizeof(float);
+        }
 
         int matched = 0;
         

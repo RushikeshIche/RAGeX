@@ -14,6 +14,7 @@ typedef struct {
     int ndim;
     int shape[4];
     DataType dtype;
+    float scale; // Scale factor for INT8 quantization
     void* data;
 } Tensor;
 

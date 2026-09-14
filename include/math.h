@@ -14,12 +14,22 @@
  */
 void gemm_f32_baseline(int M, int N, int K, float alpha, const float* A, const float* B, float beta, float* C);
 
+/**
+ * Baseline Matrix Multiplication (GEMM) with INT8 quantized B matrix.
+ */
+void gemm_f32_int8_baseline(int M, int N, int K, float alpha, const float* A, const int8_t* B, float b_scale, float beta, float* C);
+
 #ifdef __ARM_NEON
 #include <arm_neon.h>
 /**
  * ARM NEON accelerated Matrix Multiplication (GEMM) for fp32.
  */
 void gemm_f32_neon(int M, int N, int K, float alpha, const float* A, const float* B, float beta, float* C);
+
+/**
+ * ARM NEON accelerated Matrix Multiplication (GEMM) with INT8 quantized B matrix.
+ */
+void gemm_f32_int8_neon(int M, int N, int K, float alpha, const float* A, const int8_t* B, float b_scale, float beta, float* C);
 #endif
 
 #endif // RAGEX_MATH_H
