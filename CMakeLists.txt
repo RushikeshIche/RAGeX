@@ -29,3 +29,6 @@ add_executable(benchmark tests/benchmarks.c src/math.c src/memory.c src/mmap_uti
 if(UNIX)
     target_link_libraries(benchmark m pthread)
 endif()
+
+# Model Loader Test
+add_executable(test_loader tests/test_loader.c src/loader.c src/mmap_utils.c)
