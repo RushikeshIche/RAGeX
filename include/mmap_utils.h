@@ -21,4 +21,4 @@ int mmap_file_read(const char* filepath, MmapFile* mf);
 // Unmaps the file and cleans up handles
 void munmap_file(MmapFile* mf);
 
-#endif // RAGEX_MMAP_UTILS_H
+#endif 

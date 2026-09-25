@@ -17,7 +17,7 @@ endif()
 include_directories(include)
 
 # Main executable
-add_executable(edge_rag src/main.c src/memory.c src/math.c src/mmap_utils.c src/loader.c)
+add_executable(edge_rag src/main.c src/memory.c src/math.c src/mmap_utils.c src/loader.c src/tokenizer.c src/inference.c)
 
 # Add math library and pthreads
 if(UNIX)

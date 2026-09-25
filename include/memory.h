@@ -27,4 +27,4 @@ void pool_allocator_init(PoolAllocator* pool, void* buffer, size_t block_size, s
 void* pool_alloc(PoolAllocator* pool);
 void pool_free(PoolAllocator* pool, void* ptr);
 
-#endif // RAGEX_MEMORY_H
+#endif 

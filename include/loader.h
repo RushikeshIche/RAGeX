@@ -8,4 +8,4 @@
 // Returns 0 on success, -1 on failure.
 int load_minilm_model(const char* filepath, MiniLM* model, MmapFile* mf);
 
-#endif // RAGEX_LOADER_H
+#endif

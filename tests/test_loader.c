@@ -17,7 +17,7 @@ int main() {
 
     int passed = 1;
 
-    // 1. Verify standard FP32 layer mapping
+    // Verify standard FP32 layer mapping
     if (model.embeddings.word_embeddings.data == NULL) {
         printf("FAIL: Word embeddings pointer is NULL\n");
         passed = 0;
@@ -29,12 +29,12 @@ int main() {
                VOCAB_SIZE, HIDDEN_SIZE);
         passed = 0;
     }
-    if (model.embeddings.word_embeddings.dtype != DTYPE_F32) {
-        printf("FAIL: Word embeddings should be F32\n");
+    if (model.embeddings.word_embeddings.dtype != DTYPE_INT8) {
+        printf("FAIL: Word embeddings should be INT8 (because it is a 2D layer)\n");
         passed = 0;
     }
 
-    // 2. Verify INT8 Quantized layer mapping
+    // Verify INT8 Quantized layer mapping
     if (model.layers[0].attention.self.query.weight.data == NULL) {
         printf("FAIL: Layer 0 Query weight pointer is NULL\n");
         passed = 0;
@@ -48,7 +48,7 @@ int main() {
         passed = 0;
     }
 
-    // 3. Verify Pooler layer mapping
+    // Verify Pooler layer mapping
     if (model.pooler.weight.data == NULL) {
         printf("FAIL: Pooler dense weight is NULL\n");
         passed = 0;

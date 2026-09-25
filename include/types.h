@@ -18,4 +18,4 @@ typedef struct {
     void* data;
 } Tensor;
 
-#endif // RAGEX_TYPES_H
+#endif 

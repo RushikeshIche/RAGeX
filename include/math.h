@@ -32,4 +32,4 @@ void gemm_f32_neon(int M, int N, int K, float alpha, const float* A, const float
 void gemm_f32_int8_neon(int M, int N, int K, float alpha, const float* A, const int8_t* B, float b_scale, float beta, float* C);
 #endif
 
-#endif // RAGEX_MATH_H
+#endif 

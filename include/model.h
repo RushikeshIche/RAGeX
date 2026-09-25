@@ -71,4 +71,4 @@ typedef struct {
     LinearLayer pooler;
 } MiniLM;
 
-#endif // RAGEX_MODEL_H
+#endif 
