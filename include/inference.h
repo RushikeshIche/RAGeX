@@ -14,4 +14,13 @@
  */
 void forward_word_embeddings(const MiniLM* model, const int* token_ids, int seq_len, float* output);
 
+/**
+ * Adds absolute positional embeddings and token type embeddings to the word vectors.
+ * 
+ * @param model The loaded MiniLM model
+ * @param seq_len Number of tokens in the sequence
+ * @param output The buffer containing the word embeddings (will be modified in-place)
+ */
+void add_positional_embeddings(const MiniLM* model, int seq_len, float* output);
+
 #endif 
