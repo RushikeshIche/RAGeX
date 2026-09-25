@@ -1,5 +1,10 @@
 #include "inference.h"
 #include <string.h>
+#include <math.h>
+
+#ifdef __ARM_NEON
+#include <arm_neon.h>
+#endif
 
 void forward_word_embeddings(const MiniLM* model, const int* token_ids, int seq_len, float* output) {
     const Tensor* wte = &model->embeddings.word_embeddings;
@@ -100,4 +105,115 @@ void add_positional_embeddings(const MiniLM* model, int seq_len, float* output) 
             }
         }
     }
+}
+
+// Helper function: PyTorch Linear layer math (Y = X @ W^T + b)
+static void linear_forward(int M, int K, int N, const float* X, const Tensor* W, const Tensor* b, float* Y) {
+    int is_int8 = (W->dtype == DTYPE_INT8);
+    const int8_t* W_int8 = (const int8_t*)W->data;
+    const float* W_f32 = (const float*)W->data;
+    float w_scale = is_int8 ? W->scale : 1.0f;
+    const float* bias = (b && b->data) ? (const float*)b->data : NULL;
+    
+    // Standard unoptimized matrix multiplication
+    for (int i = 0; i < M; ++i) {
+        for (int j = 0; j < N; ++j) {
+            float sum = bias ? bias[j] : 0.0f;
+            for (int k = 0; k < K; ++k) {
+                float w_val = is_int8 ? ((float)W_int8[j * K + k] * w_scale) : W_f32[j * K + k];
+                sum += X[i * K + k] * w_val;
+            }
+            Y[i * N + j] = sum;
+        }
+    }
+}
+
+void forward_attention(const Attention* attn, int seq_len, const float* x, float* output, BumpAllocator* mem) {
+    int hidden_size = HIDDEN_SIZE;
+    int num_heads = NUM_ATTENTION_HEADS;
+    int head_dim = hidden_size / num_heads;
+    
+    // Allocate fast temporary memory for Q, K, V
+    float* Q = (float*)bump_alloc(mem, seq_len * hidden_size * sizeof(float));
+    float* K = (float*)bump_alloc(mem, seq_len * hidden_size * sizeof(float));
+    float* V = (float*)bump_alloc(mem, seq_len * hidden_size * sizeof(float));
+    float* context = (float*)bump_alloc(mem, seq_len * hidden_size * sizeof(float));
+    float* scores = (float*)bump_alloc(mem, seq_len * sizeof(float));
+    
+    // Project Input -> Query, Key, Value
+    linear_forward(seq_len, hidden_size, hidden_size, x, &attn->self.query.weight, &attn->self.query.bias, Q);
+    linear_forward(seq_len, hidden_size, hidden_size, x, &attn->self.key.weight, &attn->self.key.bias, K);
+    linear_forward(seq_len, hidden_size, hidden_size, x, &attn->self.value.weight, &attn->self.value.bias, V);
+    
+    // Multi-Head Self-Attention Algorithm
+    float scale = 1.0f / sqrtf((float)head_dim);
+    
+    for (int h = 0; h < num_heads; ++h) {
+        for (int i = 0; i < seq_len; ++i) { // For every word (query)
+            float* q_vec = Q + (i * hidden_size + h * head_dim);
+            
+            // Calculate Attention Scores (Q dotted with K)
+            float max_score = -1e9f;
+            for (int j = 0; j < seq_len; ++j) { // Compare against every other word (key)
+                float* k_vec = K + (j * hidden_size + h * head_dim);
+                float dot = 0.0f;
+                
+#ifdef __ARM_NEON
+                float32x4_t sum_vec = vdupq_n_f32(0.0f);
+                for (int d = 0; d < head_dim; d += 4) {
+                    float32x4_t q_v = vld1q_f32(&q_vec[d]);
+                    float32x4_t k_v = vld1q_f32(&k_vec[d]);
+                    sum_vec = vmlaq_f32(sum_vec, q_v, k_v);
+                }
+                float sum_arr[4];
+                vst1q_f32(sum_arr, sum_vec);
+                dot = sum_arr[0] + sum_arr[1] + sum_arr[2] + sum_arr[3];
+#else
+                for (int d = 0; d < head_dim; ++d) {
+                    dot += q_vec[d] * k_vec[d];
+                }
+#endif
+                
+                dot *= scale; // Scale down so numbers don't explode
+                scores[j] = dot;
+                if (dot > max_score) max_score = dot;
+            }
+            
+            // Softmax (Convert scores to probabilities summing to 1.0)
+            float sum_exp = 0.0f;
+            for (int j = 0; j < seq_len; ++j) {
+                scores[j] = expf(scores[j] - max_score);
+                sum_exp += scores[j];
+            }
+            for (int j = 0; j < seq_len; ++j) {
+                scores[j] /= sum_exp;
+            }
+            
+            // Weighted sum of Values (V)
+            float* ctx_vec = context + (i * hidden_size + h * head_dim);
+            for (int d = 0; d < head_dim; ++d) ctx_vec[d] = 0.0f;
+            
+            for (int j = 0; j < seq_len; ++j) {
+                float* v_vec = V + (j * hidden_size + h * head_dim);
+                float s = scores[j];
+                
+#ifdef __ARM_NEON
+                float32x4_t s_vec = vdupq_n_f32(s);
+                for (int d = 0; d < head_dim; d += 4) {
+                    float32x4_t ctx_v = vld1q_f32(&ctx_vec[d]);
+                    float32x4_t v_v = vld1q_f32(&v_vec[d]);
+                    ctx_v = vmlaq_f32(ctx_v, s_vec, v_v);
+                    vst1q_f32(&ctx_vec[d], ctx_v);
+                }
+#else
+                for (int d = 0; d < head_dim; ++d) {
+                    ctx_vec[d] += s * v_vec[d]; // Mix meaning based on attention probability!
+                }
+#endif
+            }
+        }
+    }
+    
+    // Final Output Projection
+    linear_forward(seq_len, hidden_size, hidden_size, context, &attn->output.dense.weight, &attn->output.dense.bias, output);
 }

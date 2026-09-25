@@ -2,6 +2,7 @@
 #define RAGEX_INFERENCE_H
 
 #include "model.h"
+#include "memory.h"
 
 /**
  * Performs the forward pass for the Word Embedding layer.
@@ -22,5 +23,16 @@ void forward_word_embeddings(const MiniLM* model, const int* token_ids, int seq_
  * @param output The buffer containing the word embeddings (will be modified in-place)
  */
 void add_positional_embeddings(const MiniLM* model, int seq_len, float* output);
+
+/**
+ * Executes the Multi-Head Self-Attention forward pass.
+ * 
+ * @param attn The Attention structures (Query, Key, Value weights)
+ * @param seq_len The length of the sequence
+ * @param x The input sequence vectors (size: seq_len * HIDDEN_SIZE)
+ * @param output The output buffer to store the results
+ * @param mem A BumpAllocator to provide fast temporary memory for Q, K, and V arrays
+ */
+void forward_attention(const Attention* attn, int seq_len, const float* x, float* output, BumpAllocator* mem);
 
 #endif 
