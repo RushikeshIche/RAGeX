@@ -35,4 +35,19 @@ void add_positional_embeddings(const MiniLM* model, int seq_len, float* output);
  */
 void forward_attention(const Attention* attn, int seq_len, const float* x, float* output, BumpAllocator* mem);
 
-#endif 
+/**
+ * Executes the Feed-Forward Network (FFN / MLP) forward pass.
+ * Each token's vector is expanded from 384 -> 1536 dimensions (with GELU activation),
+ * then compressed back down 1536 -> 384.
+ *
+ * @param intermediate The first linear layer (expand: 384 -> 1536)
+ * @param output_block The second linear layer (compress: 1536 -> 384)
+ * @param seq_len Number of tokens
+ * @param x Input buffer (seq_len * HIDDEN_SIZE floats)
+ * @param out Output buffer (seq_len * HIDDEN_SIZE floats)
+ * @param mem BumpAllocator for temporary intermediate buffer
+ */
+void forward_ffn(const Intermediate* intermediate, const OutputBlock* output_block,
+                 int seq_len, const float* x, float* out, BumpAllocator* mem);
+
+#endif

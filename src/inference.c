@@ -217,3 +217,41 @@ void forward_attention(const Attention* attn, int seq_len, const float* x, float
     // Final Output Projection
     linear_forward(seq_len, hidden_size, hidden_size, context, &attn->output.dense.weight, &attn->output.dense.bias, output);
 }
+
+// GELU activation: the version of ReLU used inside all BERT style transformers
+// Formula: x * 0.5 * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
+static inline float gelu(float x) {
+    return 0.5f * x * (1.0f + tanhf(0.7978845608f * (x + 0.044715f * x * x * x)));
+}
+
+void forward_ffn(const Intermediate* intermediate, const OutputBlock* output_block,
+                 int seq_len, const float* x, float* out, BumpAllocator* mem) {
+    // Allocate a temporary buffer in the bump arena for the expanded intermediate output
+    float* mid = (float*)bump_alloc(mem, seq_len * INTERMEDIATE_SIZE * sizeof(float));
+
+    linear_forward(seq_len, HIDDEN_SIZE, INTERMEDIATE_SIZE, x, &intermediate->dense.weight, &intermediate->dense.bias, mid);
+
+    int total_mid = seq_len * INTERMEDIATE_SIZE;
+
+#ifdef __ARM_NEON
+
+    int limit = total_mid - (total_mid % 4);
+    for (int i = 0; i < limit; i += 4) {
+        // NEON has no built-in tanh, so we call gelu() individually but unroll 4 at a time
+        // (compiler will still vectorize loads/stores around this)
+        mid[i]     = gelu(mid[i]);
+        mid[i + 1] = gelu(mid[i + 1]);
+        mid[i + 2] = gelu(mid[i + 2]);
+        mid[i + 3] = gelu(mid[i + 3]);
+    }
+    for (int i = limit; i < total_mid; ++i) {
+        mid[i] = gelu(mid[i]);
+    }
+#else
+    for (int i = 0; i < total_mid; ++i) {
+        mid[i] = gelu(mid[i]);
+    }
+#endif
+
+    linear_forward(seq_len, INTERMEDIATE_SIZE, HIDDEN_SIZE, mid, &output_block->dense.weight, &output_block->dense.bias, out);
+}
