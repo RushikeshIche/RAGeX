@@ -255,3 +255,55 @@ void forward_ffn(const Intermediate* intermediate, const OutputBlock* output_blo
 
     linear_forward(seq_len, INTERMEDIATE_SIZE, HIDDEN_SIZE, mid, &output_block->dense.weight, &output_block->dense.bias, out);
 }
+
+void layer_norm(const LayerNorm* ln, float* x, int seq_len) {
+    const float eps = 1e-12f; // Small epsilon to prevent division by zero
+    const float* weight = (const float*)ln->weight.data;
+    const float* bias   = (const float*)ln->bias.data;
+    
+    for (int i = 0; i < seq_len; ++i) {
+        float* row = x + (i * HIDDEN_SIZE);
+        
+        // Compute mean of this token's 384 values
+        float mean = 0.0f;
+        for (int d = 0; d < HIDDEN_SIZE; ++d) {
+            mean += row[d];
+        }
+        mean /= (float)HIDDEN_SIZE;
+        
+        // Compute variance
+        float var = 0.0f;
+        for (int d = 0; d < HIDDEN_SIZE; ++d) {
+            float diff = row[d] - mean;
+            var += diff * diff;
+        }
+        var /= (float)HIDDEN_SIZE;
+        
+        // Normalize and apply learned scale/shift
+        float inv_std = 1.0f / sqrtf(var + eps);
+        
+#ifdef __ARM_NEON
+        float32x4_t mean_v = vdupq_n_f32(mean);
+        float32x4_t istd_v = vdupq_n_f32(inv_std);
+        int limit = HIDDEN_SIZE - (HIDDEN_SIZE % 4);
+        
+        for (int d = 0; d < limit; d += 4) {
+            float32x4_t v = vld1q_f32(&row[d]);
+            float32x4_t w = vld1q_f32(&weight[d]);
+            float32x4_t b = vld1q_f32(&bias[d]);
+            // (x - mean) / std * weight + bias
+            v = vmulq_f32(vsubq_f32(v, mean_v), istd_v);
+            v = vmlaq_f32(b, v, w);
+            vst1q_f32(&row[d], v);
+        }
+        for (int d = limit; d < HIDDEN_SIZE; ++d) {
+            row[d] = ((row[d] - mean) * inv_std) * weight[d] + bias[d];
+        }
+#else
+        for (int d = 0; d < HIDDEN_SIZE; ++d) {
+            row[d] = ((row[d] - mean) * inv_std) * weight[d] + bias[d];
+        }
+#endif
+    }
+}
+

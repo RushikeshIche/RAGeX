@@ -81,10 +81,16 @@ To verify that your build was successful and to measure the speed of the matrix 
 
 ## Roadmap (Current Progress)
 
-- [x] **Phase 1: Foundation** (CMake, Memory Allocators, ARM NEON GEMM)
-- [x] **Phase 2: Embedding Model Conversion** (Python Exporter, C Structs)
-- [ ] **Phase 2: Model Loading** (Memory mapping `.bin` weights into C structs)
-- [ ] **Phase 3: Transformer Inference** (Self-Attention, Embeddings, FFN)
+- [x] **Phase 1: Foundation** (CMake, Custom Memory Allocators, ARM NEON GEMM)
+- [x] **Phase 2: Embedding Model Conversion** (Python INT8 Quantized Exporter)
+- [x] **Phase 2: Model Loading** (Zero-copy `mmap` loader, C struct definitions)
+- [x] **Phase 3: Transformer Inference (In Progress)**
+  - [x] Token & Positional Embedding forward pass
+  - [x] Multi-Head Self-Attention (with NEON optimization)
+  - [x] Feed-Forward Network (FFN) with GELU activation
+  - [x] Layer Normalization
+  - [ ] Full Transformer block combination (Task 23)
+  - [ ] Validation against PyTorch output (Task 24)
 - [ ] **Phase 4: Tokenizer & Document Chunker** (BPE, chunking)
 - [ ] **Phase 5: Vector Index** (IVF + PQ for fast retrieval)
 - [ ] **Phase 6: Tiny LLM Generation** (4-bit quantization, Llama architecture)

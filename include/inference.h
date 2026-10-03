@@ -50,4 +50,15 @@ void forward_attention(const Attention* attn, int seq_len, const float* x, float
 void forward_ffn(const Intermediate* intermediate, const OutputBlock* output_block,
                  int seq_len, const float* x, float* out, BumpAllocator* mem);
 
+/**
+ * Applies Layer Normalization to a buffer of token vectors (in-place).
+ * Normalizes each token's 384-dim vector to have mean=0, std=1, then
+ * applies learned scale (weight) and shift (bias) parameters.
+ *
+ * @param ln The LayerNorm struct containing weight and bias tensors
+ * @param x  Buffer of (seq_len * HIDDEN_SIZE) floats, modified in-place
+ * @param seq_len Number of tokens
+ */
+void layer_norm(const LayerNorm* ln, float* x, int seq_len);
+
 #endif
