@@ -61,4 +61,17 @@ void forward_ffn(const Intermediate* intermediate, const OutputBlock* output_blo
  */
 void layer_norm(const LayerNorm* ln, float* x, int seq_len);
 
+/**
+ * Runs the full MiniLM forward pass for a sequence of token IDs.
+ * Combines all layers: Embeddings -> 6x(Attention+FFN+LayerNorm) -> Pooling.
+ * Outputs one 384-dim sentence embedding vector.
+ *
+ * @param model     The loaded MiniLM model
+ * @param token_ids Input token ID array
+ * @param seq_len   Number of tokens in the sequence
+ * @param embedding Output buffer (must be HIDDEN_SIZE floats = 384)
+ * @param mem       BumpAllocator for all intermediate buffers
+ */
+void forward_encoder(const MiniLM* model, const int* token_ids, int seq_len, float* embedding, BumpAllocator* mem);
+
 #endif

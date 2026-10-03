@@ -307,3 +307,64 @@ void layer_norm(const LayerNorm* ln, float* x, int seq_len) {
     }
 }
 
+
+void forward_encoder(const MiniLM* model, const int* token_ids, int seq_len, float* embedding, BumpAllocator* mem) {
+    // Allocate two working buffers for the token sequence in our fast arena memory
+    // We ping-pong between them so we never need to copy data
+    float* buf_a = (float*)bump_alloc(mem, seq_len * HIDDEN_SIZE * sizeof(float));
+    float* buf_b = (float*)bump_alloc(mem, seq_len * HIDDEN_SIZE * sizeof(float));
+
+    // === Stage 1: Embeddings ===
+    // Look up the word embedding for each token ID
+    forward_word_embeddings(model, token_ids, seq_len, buf_a);
+    // Add position and token-type signals so the AI knows word order
+    add_positional_embeddings(model, seq_len, buf_a);
+    // Normalize the embedding layer's output with its own LayerNorm
+    layer_norm(&model->embeddings.layer_norm, buf_a, seq_len);
+
+    // === Stage 2: 6 Transformer Encoder Layers ===
+    for (int l = 0; l < NUM_HIDDEN_LAYERS; ++l) {
+        const TransformerLayer* layer = &model->layers[l];
+
+        // --- Sub-layer 1: Multi-Head Self-Attention ---
+        // Input:  buf_a  (current token representations)
+        // Output: buf_b  (attention-enriched representations)
+        forward_attention(&layer->attention, seq_len, buf_a, buf_b, mem);
+
+        // Residual connection: add the original input back to the output
+        // This is the "skip connection" that keeps gradients flowing during training
+        for (int i = 0; i < seq_len * HIDDEN_SIZE; ++i) {
+            buf_b[i] += buf_a[i];
+        }
+        // Apply LayerNorm after attention + residual
+        layer_norm(&layer->attention.output.layer_norm, buf_b, seq_len);
+
+        // --- Sub-layer 2: Feed-Forward Network ---
+        // Input:  buf_b  (attention output)
+        // Output: buf_a  (FFN output — we swap buffers!)
+        forward_ffn(&layer->intermediate, &layer->output, seq_len, buf_b, buf_a, mem);
+
+        // Residual connection: add attention output back to FFN output
+        for (int i = 0; i < seq_len * HIDDEN_SIZE; ++i) {
+            buf_a[i] += buf_b[i];
+        }
+        // Apply LayerNorm after FFN + residual
+        layer_norm(&layer->output.layer_norm, buf_a, seq_len);
+    }
+
+    // === Stage 3: Mean Pooling ===
+    // We now have a (seq_len x 384) matrix. We need ONE 384-dim sentence vector.
+    // Mean pooling: average across all token positions
+    for (int d = 0; d < HIDDEN_SIZE; ++d) {
+        embedding[d] = 0.0f;
+    }
+    for (int i = 0; i < seq_len; ++i) {
+        for (int d = 0; d < HIDDEN_SIZE; ++d) {
+            embedding[d] += buf_a[i * HIDDEN_SIZE + d];
+        }
+    }
+    float inv_seq = 1.0f / (float)seq_len;
+    for (int d = 0; d < HIDDEN_SIZE; ++d) {
+        embedding[d] *= inv_seq;
+    }
+}
