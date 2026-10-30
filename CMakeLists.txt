@@ -25,10 +25,16 @@ if(UNIX)
 endif()
 
 # Benchmark executable
-add_executable(benchmark tests/benchmarks.c src/math.c src/memory.c src/mmap_utils.c src/loader.c)
+add_executable(benchmark tests/benchmarks.c src/math.c src/memory.c src/mmap_utils.c src/loader.c src/inference.c src/tokenizer.c)
 if(UNIX)
     target_link_libraries(benchmark m pthread)
 endif()
 
 # Model Loader Test
 add_executable(test_loader tests/test_loader.c src/loader.c src/mmap_utils.c)
+
+# Inference Validation Test
+add_executable(test_inference tests/test_inference.c src/loader.c src/mmap_utils.c src/memory.c src/math.c src/inference.c src/tokenizer.c)
+if(UNIX)
+    target_link_libraries(test_inference m pthread)
+endif()

@@ -3,6 +3,12 @@
 #include <time.h>
 #include "../include/math.h"
 #include "../include/memory.h"
+#include "../include/model.h"
+#include "../include/loader.h"
+#include "../include/mmap_utils.h"
+#include "../include/inference.h"
+
+#define BUMP_SIZE (64 * 1024 * 1024)
 
 void bench_gemm() {
     int M = 256, N = 256, K = 256; 
@@ -75,9 +81,44 @@ void bench_memory_allocators() {
     free(buffer);
 }
 
-int main() {
+void bench_embedding_latency(void) {
+    printf("\nRunning embedding latency benchmark...\n");
+
+    MiniLM   model;
+    MmapFile mf;
+    if (load_minilm_model("models/minilm_weights.bin", &model, &mf) != 0) {
+        printf("  [SKIP] Could not load model weights.\n");
+        return;
+    }
+
+    uint8_t* bump_buf = (uint8_t*)malloc(BUMP_SIZE);
+    BumpAllocator mem;
+    bump_allocator_init(&mem, bump_buf, BUMP_SIZE);
+
+    int token_ids[32] = {101, 7592, 2088, 102};
+    int seq_len = 4;
+    float embedding[HIDDEN_SIZE];
+
+    int iters = 50;
+    forward_encoder(&model, token_ids, seq_len, embedding, &mem);
+
+    clock_t start = clock();
+    for (int i = 0; i < iters; ++i) {
+        bump_reset(&mem);
+        forward_encoder(&model, token_ids, seq_len, embedding, &mem);
+    }
+    clock_t end = clock();
+    double ms = ((double)(end - start) / CLOCKS_PER_SEC) * 1000.0 / iters;
+    printf("Embedding latency (seq=%d): %.3f ms per call\n", seq_len, ms);
+
+    free(bump_buf);
+    munmap_file(&mf);
+}
+
+int main(void) {
     printf("=== RAGeX Benchmarks ===\n\n");
     bench_gemm();
     bench_memory_allocators();
+    bench_embedding_latency();
     return 0;
 }
